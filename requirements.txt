@@ -1,0 +1,7 @@
+requests>=2.31.0
+faker>=20.1.0
+flask>=3.0.0
+clickhouse-driver>=0.2.6
+plotly>=5.17.0
+pandas>=2.2.0
+numpy>=1.26.0

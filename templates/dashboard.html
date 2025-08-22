@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ClickHouse Analytics Dashboard</title>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body {
+            background-color: #f8f9fa;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        .navbar-brand {
+            font-weight: bold;
+            font-size: 1.5rem;
+        }
+        .card {
+            border: none;
+            border-radius: 15px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            transition: transform 0.2s;
+        }
+        .card:hover {
+            transform: translateY(-2px);
+        }
+        .card-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 15px 15px 0 0 !important;
+            font-weight: 600;
+        }
+        .stat-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 15px;
+        }
+        .stat-number {
+            font-size: 2.5rem;
+            font-weight: bold;
+        }
+        .stat-label {
+            font-size: 0.9rem;
+            opacity: 0.9;
+        }
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #6c757d;
+        }
+        .search-container {
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .table-responsive {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .chart-container {
+            height: 400px;
+        }
+        .btn-custom {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            color: white;
+            border-radius: 10px;
+        }
+        .btn-custom:hover {
+            background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <div class="container">
+            <a class="navbar-brand" href="#">
+                <i class="fas fa-chart-line me-2"></i>
+                ClickHouse Analytics Dashboard
+            </a>
+            <div class="navbar-text">
+                Real-time Data Analytics & Insights
+            </div>
+        </div>
+    </nav>
+
+    <div class="container-fluid mt-4">
+        <!-- Statistics Cards Row -->
+        <div class="row mb-4">
+            <div class="col-md-3">
+                <div class="card stat-card">
+                    <div class="card-body text-center">
+                        <i class="fas fa-users fa-2x mb-2"></i>
+                        <div class="stat-number" id="users-count">-</div>
+                        <div class="stat-label">Total Users</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card stat-card">
+                    <div class="card-body text-center">
+                        <i class="fas fa-mouse-pointer fa-2x mb-2"></i>
+                        <div class="stat-number" id="events-count">-</div>
+                        <div class="stat-label">Total Events</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card stat-card">
+                    <div class="card-body text-center">
+                        <i class="fas fa-shopping-cart fa-2x mb-2"></i>
+                        <div class="stat-number" id="orders-count">-</div>
+                        <div class="stat-label">Total Orders</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card stat-card">
+                    <div class="card-body text-center">
+                        <i class="fas fa-dollar-sign fa-2x mb-2"></i>
+                        <div class="stat-number" id="total-revenue">-</div>
+                        <div class="stat-label">Total Revenue</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Charts Row 1 -->
+        <div class="row mb-4">
+            <div class="col-md-8">
+                <div class="card">
+                    <div class="card-header">
+                        <i class="fas fa-chart-area me-2"></i>
+                        Daily Events & Users (Last 30 Days)
+                    </div>
+                    <div class="card-body">
+                        <div id="daily-events-chart" class="chart-container"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-header">
+                        <i class="fas fa-chart-pie me-2"></i>
+                        Event Types (Last 7 Days)
+                    </div>
+                    <div class="card-body">
+                        <div id="event-types-chart" class="chart-container"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Charts Row 2 -->
+        <div class="row mb-4">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <i class="fas fa-chart-bar me-2"></i>
+                        Monthly Revenue (Last 12 Months)
+                    </div>
+                    <div class="card-body">
+                        <div id="revenue-chart" class="chart-container"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <i class="fas fa-globe me-2"></i>
+                        Top Countries by Users
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover" id="countries-table">
+                                <thead class="table-primary">
+                                    <tr>
+                                        <th>Country</th>
+                                        <th>Users</th>
+                                        <th>Avg Age</th>
+                                        <th>Total Spent</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr><td colspan="4" class="loading"><i class="fas fa-spinner fa-spin"></i> Loading...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Search and Tables Row -->
+        <div class="row mb-4">
+            <div class="col-md-6">
+                <div class="search-container">
+                    <h5><i class="fas fa-search me-2"></i>Data Explorer</h5>
+                    <div class="row">
+                        <div class="col-md-4">
+                            <select class="form-select" id="search-type">
+                                <option value="users">Users</option>
+                                <option value="products">Products</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <input type="text" class="form-control" id="search-input" placeholder="Enter search term...">
+                        </div>
+                        <div class="col-md-2">
+                            <button class="btn btn-custom w-100" onclick="performSearch()">
+                                <i class="fas fa-search"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="mt-3">
+                        <div class="table-responsive" style="max-height: 300px;">
+                            <table class="table table-sm table-hover" id="search-results">
+                                <thead class="table-primary">
+                                    <tr id="search-headers">
+                                        <td colspan="5" class="text-center text-muted">Enter a search term to explore data</td>
+                                    </tr>
+                                </thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <i class="fas fa-medal me-2"></i>
+                        Top Products by Sales
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover table-sm" id="products-table">
+                                <thead class="table-primary">
+                                    <tr>
+                                        <th>Product</th>
+                                        <th>Category</th>
+                                        <th>Sold</th>
+                                        <th>Revenue</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr><td colspan="4" class="loading"><i class="fas fa-spinner fa-spin"></i> Loading...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- User Segments -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <i class="fas fa-users-cog me-2"></i>
+                        User Segments Analysis
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover" id="segments-table">
+                                <thead class="table-primary">
+                                    <tr>
+                                        <th>Segment</th>
+                                        <th>User Count</th>
+                                        <th>Average Spent</th>
+                                        <th>Average Age</th>
+                                        <th>Percentage</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr><td colspan="5" class="loading"><i class="fas fa-spinner fa-spin"></i> Loading...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Utility functions
+        function formatNumber(num) {
+            if (num >= 1000000) {
+                return (num / 1000000).toFixed(1) + 'M';
+            } else if (num >= 1000) {
+                return (num / 1000).toFixed(1) + 'K';
+            }
+            return num.toLocaleString();
+        }
+
+        function formatCurrency(amount) {
+            return '$' + amount.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+        }
+
+        // Load statistics
+        function loadStats() {
+            fetch('/api/stats')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) {
+                        console.error('Error loading stats:', data.error);
+                        return;
+                    }
+                    document.getElementById('users-count').textContent = formatNumber(data.users_count);
+                    document.getElementById('events-count').textContent = formatNumber(data.events_count);
+                    document.getElementById('orders-count').textContent = formatNumber(data.orders_count);
+                    document.getElementById('total-revenue').textContent = formatCurrency(data.total_revenue);
+                })
+                .catch(error => console.error('Error loading stats:', error));
+        }
+
+        // Load daily events chart
+        function loadDailyEventsChart() {
+            fetch('/api/daily-events')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) {
+                        console.error('Error loading daily events:', data.error);
+                        return;
+                    }
+                    
+                    const trace1 = {
+                        x: data.dates,
+                        y: data.events,
+                        type: 'scatter',
+                        mode: 'lines+markers',
+                        name: 'Events',
+                        line: {color: '#667eea', width: 3},
+                        yaxis: 'y'
+                    };
+                    
+                    const trace2 = {
+                        x: data.dates,
+                        y: data.unique_users,
+                        type: 'scatter',
+                        mode: 'lines+markers',
+                        name: 'Unique Users',
+                        line: {color: '#764ba2', width: 3},
+                        yaxis: 'y2'
+                    };
+                    
+                    const layout = {
+                        yaxis: {title: 'Events', side: 'left'},
+                        yaxis2: {title: 'Unique Users', side: 'right', overlaying: 'y'},
+                        xaxis: {title: 'Date'},
+                        margin: {l: 50, r: 50, t: 20, b: 50},
+                        showlegend: true,
+                        legend: {x: 0, y: 1}
+                    };
+                    
+                    Plotly.newPlot('daily-events-chart', [trace1, trace2], layout, {responsive: true});
+                })
+                .catch(error => console.error('Error loading daily events chart:', error));
+        }
+
+        // Load event types chart
+        function loadEventTypesChart() {
+            fetch('/api/event-types')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) {
+                        console.error('Error loading event types:', data.error);
+                        return;
+                    }
+                    
+                    const trace = {
+                        labels: data.labels,
+                        values: data.values,
+                        type: 'pie',
+                        hole: 0.4,
+                        marker: {
+                            colors: ['#667eea', '#764ba2', '#f093fb', '#f5576c', '#4facfe', '#00f2fe', '#43e97b', '#38f9d7']
+                        }
+                    };
+                    
+                    const layout = {
+                        margin: {l: 20, r: 20, t: 20, b: 20},
+                        showlegend: true,
+                        legend: {orientation: 'v', x: 1, y: 0.5}
+                    };
+                    
+                    Plotly.newPlot('event-types-chart', [trace], layout, {responsive: true});
+                })
+                .catch(error => console.error('Error loading event types chart:', error));
+        }
+
+        // Load revenue chart
+        function loadRevenueChart() {
+            fetch('/api/revenue-by-month')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) {
+                        console.error('Error loading revenue data:', data.error);
+                        return;
+                    }
+                    
+                    const months = data.months.map(m => {
+                        const year = m.substring(0, 4);
+                        const month = m.substring(4, 6);
+                        return `${year}-${month}`;
+                    });
+                    
+                    const trace = {
+                        x: months,
+                        y: data.revenue,
+                        type: 'bar',
+                        marker: {
+                            color: '#667eea',
+                            line: {color: '#764ba2', width: 1}
+                        }
+                    };
+                    
+                    const layout = {
+                        xaxis: {title: 'Month'},
+                        yaxis: {title: 'Revenue ($)'},
+                        margin: {l: 60, r: 20, t: 20, b: 60}
+                    };
+                    
+                    Plotly.newPlot('revenue-chart', [trace], layout, {responsive: true});
+                })
+                .catch(error => console.error('Error loading revenue chart:', error));
+        }
+
+        // Load top countries table
+        function loadTopCountries() {
+            fetch('/api/top-countries')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) {
+                        console.error('Error loading countries data:', data.error);
+                        return;
+                    }
+                    
+                    const tbody = document.querySelector('#countries-table tbody');
+                    tbody.innerHTML = '';
+                    
+                    data.forEach(country => {
+                        const row = tbody.insertRow();
+                        row.innerHTML = `
+                            <td><strong>${country.country}</strong></td>
+                            <td>${formatNumber(country.user_count)}</td>
+                            <td>${country.avg_age}</td>
+                            <td>${formatCurrency(country.total_spent)}</td>
+                        `;
+                    });
+                })
+                .catch(error => console.error('Error loading countries data:', error));
+        }
+
+        // Load top products table
+        function loadTopProducts() {
+            fetch('/api/top-products')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) {
+                        console.error('Error loading products data:', data.error);
+                        return;
+                    }
+                    
+                    const tbody = document.querySelector('#products-table tbody');
+                    tbody.innerHTML = '';
+                    
+                    data.slice(0, 10).forEach(product => {
+                        const row = tbody.insertRow();
+                        row.innerHTML = `
+                            <td><strong>${product.product_name}</strong></td>
+                            <td><span class="badge bg-secondary">${product.category}</span></td>
+                            <td>${formatNumber(product.total_sold)}</td>
+                            <td>${formatCurrency(product.total_revenue)}</td>
+                        `;
+                    });
+                })
+                .catch(error => console.error('Error loading products data:', error));
+        }
+
+        // Load user segments
+        function loadUserSegments() {
+            fetch('/api/user-segments')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) {
+                        console.error('Error loading segments data:', data.error);
+                        return;
+                    }
+                    
+                    const tbody = document.querySelector('#segments-table tbody');
+                    tbody.innerHTML = '';
+                    
+                    const totalUsers = data.reduce((sum, segment) => sum + segment.user_count, 0);
+                    
+                    data.forEach(segment => {
+                        const percentage = ((segment.user_count / totalUsers) * 100).toFixed(1);
+                        const row = tbody.insertRow();
+                        row.innerHTML = `
+                            <td><strong>${segment.segment}</strong></td>
+                            <td>${formatNumber(segment.user_count)}</td>
+                            <td>${formatCurrency(segment.avg_spent)}</td>
+                            <td>${segment.avg_age}</td>
+                            <td>
+                                <div class="progress" style="height: 20px;">
+                                    <div class="progress-bar" style="width: ${percentage}%;">${percentage}%</div>
+                                </div>
+                            </td>
+                        `;
+                    });
+                })
+                .catch(error => console.error('Error loading segments data:', error));
+        }
+
+        // Search functionality
+        function performSearch() {
+            const type = document.getElementById('search-type').value;
+            const query = document.getElementById('search-input').value;
+            
+            if (!query.trim()) {
+                alert('Please enter a search term');
+                return;
+            }
+            
+            fetch(`/api/search?type=${type}&q=${encodeURIComponent(query)}&limit=20`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) {
+                        console.error('Error searching:', data.error);
+                        return;
+                    }
+                    
+                    const table = document.getElementById('search-results');
+                    const headers = document.getElementById('search-headers');
+                    const tbody = table.querySelector('tbody');
+                    
+                    // Update headers based on search type
+                    if (type === 'users') {
+                        headers.innerHTML = `
+                            <th>ID</th>
+                            <th>Username</th>
+                            <th>Email</th>
+                            <th>Country</th>
+                            <th>Total Spent</th>
+                        `;
+                    } else {
+                        headers.innerHTML = `
+                            <th>ID</th>
+                            <th>Product Name</th>
+                            <th>Category</th>
+                            <th>Price</th>
+                            <th>Created Date</th>
+                        `;
+                    }
+                    
+                    // Update table body
+                    tbody.innerHTML = '';
+                    
+                    if (data.length === 0) {
+                        const row = tbody.insertRow();
+                        row.innerHTML = `<td colspan="5" class="text-center text-muted">No results found</td>`;
+                        return;
+                    }
+                    
+                    data.forEach(item => {
+                        const row = tbody.insertRow();
+                        if (type === 'users') {
+                            row.innerHTML = `
+                                <td>${item.user_id}</td>
+                                <td><strong>${item.username}</strong></td>
+                                <td>${item.email}</td>
+                                <td>${item.country}</td>
+                                <td>${formatCurrency(item.total_spent)}</td>
+                            `;
+                        } else {
+                            row.innerHTML = `
+                                <td>${item.product_id}</td>
+                                <td><strong>${item.product_name}</strong></td>
+                                <td><span class="badge bg-secondary">${item.category}</span></td>
+                                <td>${formatCurrency(item.price)}</td>
+                                <td>${item.created_date}</td>
+                            `;
+                        }
+                    });
+                })
+                .catch(error => console.error('Error performing search:', error));
+        }
+
+        // Event listeners
+        document.getElementById('search-input').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                performSearch();
+            }
+        });
+
+        // Load all data when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            loadStats();
+            loadDailyEventsChart();
+            loadEventTypesChart();
+            loadRevenueChart();
+            loadTopCountries();
+            loadTopProducts();
+            loadUserSegments();
+        });
+
+        // Auto-refresh data every 30 seconds
+        setInterval(function() {
+            loadStats();
+        }, 30000);
+    </script>
+</body>
+</html>
