@@ -1,0 +1,31 @@
+-- 示例：表结构变更脚本
+-- 文件名格式：02-alter-tables.sql（数字前缀确保执行顺序）
+-- 
+-- 注意：ClickHouse 的 ALTER TABLE ADD COLUMN 是异步操作
+-- 对于 MergeTree 引擎，新增列会自动应用到所有现有分区
+
+USE demo_db;
+
+-- 示例 1: 给 users 表添加新列（带默认值）
+-- ALTER TABLE users ADD COLUMN IF NOT EXISTS phone_number String DEFAULT '';
+
+-- 示例 2: 给 events 表添加新列（Nullable，允许 NULL）
+-- ALTER TABLE events ADD COLUMN IF NOT EXISTS user_agent String NULL;
+
+-- 示例 3: 给 orders 表添加新列（带默认值）
+-- ALTER TABLE orders ADD COLUMN IF NOT EXISTS discount_amount Decimal(10,2) DEFAULT 0;
+
+-- 示例 4: 给 products 表添加新列
+-- ALTER TABLE products ADD COLUMN IF NOT EXISTS description String DEFAULT '';
+
+-- 示例 5: 修改列类型（需要谨慎，可能影响现有数据）
+-- ALTER TABLE users MODIFY COLUMN total_spent Decimal(12,2);
+
+-- 示例 6: 删除列（需要谨慎，会丢失数据）
+-- ALTER TABLE users DROP COLUMN IF EXISTS phone_number;
+
+-- 示例 7: 添加多个列
+-- ALTER TABLE users 
+--     ADD COLUMN IF NOT EXISTS last_login_date Date DEFAULT today(),
+--     ADD COLUMN IF NOT EXISTS login_count UInt32 DEFAULT 0;
+
