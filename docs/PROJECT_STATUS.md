@@ -12,7 +12,7 @@
 
 ### AI Chat Assistant
 - [x] Natural language to SQL query generation
-- [x] Integration with local Ollama (Llama 3)
+- [x] Integration with Azure OpenAI
 - [x] Safety validation (SELECT queries only)
 - [x] Beautiful chat interface with syntax highlighting
 - [x] Schema-aware query generation
@@ -49,7 +49,7 @@ python3 generate_data.py
 # 3. Start analytics dashboard
 docker compose up -d app
 
-# 4. Start AI chat (requires local Ollama)
+# 4. Start AI chat (requires Azure OpenAI credentials)
 ./start_chat_local.sh
 
 # 5. Optional: Start data streaming
@@ -61,8 +61,7 @@ docker compose up -d app
 ### Required
 - Docker & Docker Compose
 - Python 3.8+
-- Local Ollama installation
-- Llama 3 model (`ollama pull llama3`)
+- Azure OpenAI API credentials (endpoint and API key)
 
 ### Python Packages (in requirements.txt)
 - Flask 3.0+
@@ -89,7 +88,7 @@ clickhouse-demo/
 ├── stream_data.py          # Real-time data streaming
 ├── 
 ├── # Startup Scripts
-├── start_chat_local.sh     # Start AI chat with local Ollama
+├── setup_ai_chat.sh         # Setup AI chat with Azure OpenAI
 ├── start_streaming.sh      # Start data streaming
 ├── 
 ├── # Docker Configuration

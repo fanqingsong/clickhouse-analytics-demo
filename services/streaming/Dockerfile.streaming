@@ -1,4 +1,4 @@
-FROM python:3.11-slim
+FROM docker.1ms.run/python:3.11-slim
 
 WORKDIR /app
 
@@ -11,13 +11,8 @@ RUN apt-get update && apt-get install -y \
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy application code
-COPY app.py .
-COPY templates/ templates/
-COPY static/ static/
+# Copy streaming script
+COPY stream_data.py .
 
-# Expose port
-EXPOSE 3000
+# No CMD needed, will be overridden in docker-compose.yml
 
-# Run the application
-CMD ["python", "app.py"]

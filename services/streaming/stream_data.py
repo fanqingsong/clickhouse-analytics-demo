@@ -23,12 +23,13 @@ MAX_ORDERS_TOTAL = 1000   # Maximum orders to keep in database
 BATCH_SIZE_EVENTS = 10    # Events to add per batch
 BATCH_SIZE_ORDERS = 3     # Orders to add per batch
 
-# ClickHouse connection settings
-CLICKHOUSE_HOST = "localhost"
-CLICKHOUSE_PORT = 8123
-CLICKHOUSE_USER = "demo_user"
-CLICKHOUSE_PASSWORD = "demo_password"
-CLICKHOUSE_DB = "demo_db"
+# ClickHouse connection settings (can be overridden by environment variables)
+import os
+CLICKHOUSE_HOST = os.getenv("CLICKHOUSE_HOST", "localhost")
+CLICKHOUSE_PORT = int(os.getenv("CLICKHOUSE_PORT", "8123"))
+CLICKHOUSE_USER = os.getenv("CLICKHOUSE_USER", "demo_user")
+CLICKHOUSE_PASSWORD = os.getenv("CLICKHOUSE_PASSWORD", "demo_password")
+CLICKHOUSE_DB = os.getenv("CLICKHOUSE_DB", "demo_db")
 
 class ClickHouseStreamer:
     def __init__(self):

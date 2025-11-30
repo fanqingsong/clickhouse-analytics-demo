@@ -8,6 +8,7 @@ import random
 import time
 from datetime import datetime, timedelta, date
 from typing import List, Dict
+from collections import defaultdict
 import requests
 import json
 from faker import Faker
@@ -15,12 +16,13 @@ import uuid
 
 fake = Faker()
 
-# ClickHouse connection settings
-CLICKHOUSE_HOST = "localhost"
-CLICKHOUSE_PORT = 8123
-CLICKHOUSE_USER = "demo_user"
-CLICKHOUSE_PASSWORD = "demo_password"
-CLICKHOUSE_DB = "demo_db"
+# ClickHouse connection settings (can be overridden by environment variables)
+import os
+CLICKHOUSE_HOST = os.getenv("CLICKHOUSE_HOST", "localhost")
+CLICKHOUSE_PORT = int(os.getenv("CLICKHOUSE_PORT", "8123"))
+CLICKHOUSE_USER = os.getenv("CLICKHOUSE_USER", "demo_user")
+CLICKHOUSE_PASSWORD = os.getenv("CLICKHOUSE_PASSWORD", "demo_password")
+CLICKHOUSE_DB = os.getenv("CLICKHOUSE_DB", "demo_db")
 
 class ClickHouseClient:
     def __init__(self, host: str, port: int, user: str, password: str, database: str):
@@ -197,6 +199,36 @@ def insert_data_in_batches(client: ClickHouseClient, table: str, data: List[Dict
         print(f"Batch {i // batch_size + 1}/{total_batches} completed for {table}")
         time.sleep(0.1)  # Small delay to avoid overwhelming the server
 
+def insert_data_by_date(client: ClickHouseClient, table: str, data: List[Dict], date_key: str = 'order_date', max_partitions_per_batch: int = 50, extract_date_from_timestamp: bool = False):
+    """Insert data grouped by date to avoid too many partitions error"""
+    # Group data by date
+    data_by_date = defaultdict(list)
+    for row in data:
+        if extract_date_from_timestamp:
+            # Extract date from timestamp string (format: 'YYYY-MM-DD HH:MM:SS')
+            timestamp_str = row[date_key]
+            date_value = timestamp_str.split(' ')[0]  # Extract date part
+        else:
+            date_value = row[date_key]
+        data_by_date[date_value].append(row)
+    
+    # Insert data grouped by date, ensuring each batch doesn't exceed max_partitions_per_batch
+    dates = sorted(data_by_date.keys())
+    total_dates = len(dates)
+    batch_num = 0
+    
+    for i in range(0, len(dates), max_partitions_per_batch):
+        date_batch = dates[i:i + max_partitions_per_batch]
+        batch_data = []
+        for date in date_batch:
+            batch_data.extend(data_by_date[date])
+        
+        if batch_data:
+            client.insert_data(table, batch_data)
+            batch_num += 1
+            print(f"Inserted {len(batch_data)} rows for dates {date_batch[0]} to {date_batch[-1]} ({batch_num} date batches)")
+            time.sleep(0.1)  # Small delay to avoid overwhelming the server
+
 def main():
     """Main function to generate and insert all test data"""
     print("Starting data generation for ClickHouse demo...")
@@ -233,11 +265,14 @@ def main():
     
     print("\n3. Generating orders data...")
     orders = generate_orders(10000, 1000, 25000)
-    insert_data_in_batches(client, "orders", orders, batch_size=500)  # Smaller batch size
+    # Use date-grouped insertion to avoid "too many partitions" error
+    insert_data_by_date(client, "orders", orders, date_key='order_date', max_partitions_per_batch=50)
     
     print("\n4. Generating events data (this will take a while)...")
     events = generate_events(10000, 50)  # 500K+ events
-    insert_data_in_batches(client, "events", events, batch_size=5000)
+    # Use date-grouped insertion to avoid "too many partitions" error
+    # event_date is MATERIALIZED from event_timestamp, so extract date from timestamp
+    insert_data_by_date(client, "events", events, date_key='event_timestamp', max_partitions_per_batch=50, extract_date_from_timestamp=True)
     
     print("\nData generation completed!")
     

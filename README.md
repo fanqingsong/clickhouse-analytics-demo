@@ -7,7 +7,7 @@ A comprehensive demonstration of ClickHouse with a modern web dashboard for real
 - **ClickHouse Database**: High-performance columnar database optimized for analytics
 - **Realistic Test Data**: 500K+ events, 10K users, 1K products, and 25K orders
 - **Interactive Dashboard**: Modern web interface with real-time charts and analytics
-- **AI Chat Assistant**: Natural language queries powered by Llama 3 (local Ollama)
+- **AI Chat Assistant**: Natural language queries powered by Azure OpenAI
 - **Real-time Data Streaming**: Continuous data generation for live demos
 - **Docker Setup**: Easy deployment with Docker Compose
 - **RESTful API**: Backend API for data access and analytics
@@ -33,13 +33,45 @@ A comprehensive demonstration of ClickHouse with a modern web dashboard for real
 
 ## 🛠 Prerequisites
 
-- Docker and Docker Compose installed on your macOS
-- At least 4GB of RAM available for containers
-- Ports 8123, 9000, 3000, and 5001 available
-- **Ollama** (installed locally) for AI chat features
-- **Llama 3 model** pulled in Ollama: `ollama pull llama3`
+- Docker and Docker Compose installed
+- At least 4GB of RAM available for containers (8GB+ recommended if using AI chat)
+- Ports 8123, 9000, 3000, 5001, and 11434 available
+- **Note**: Requires Azure OpenAI API credentials (endpoint and API key)
 
 ## 🚀 Quick Start
+
+### 方式一：一键启动（推荐）
+
+使用提供的一键启停脚本，自动完成所有启动步骤：
+
+```bash
+# 启动基础服务（ClickHouse + Web 应用）
+./scripts/start.sh basic
+
+# 或启动所有服务（包括 AI 聊天和实时流）
+./scripts/start.sh all
+
+# 或仅启动基础服务 + AI 聊天
+./scripts/start.sh ai
+```
+
+停止服务：
+```bash
+# 停止服务但保留数据
+./scripts/stop.sh basic
+
+# 停止服务并删除所有数据
+./scripts/stop.sh all
+```
+
+脚本会自动完成：
+- ✅ 检查依赖和端口占用
+- ✅ 启动 ClickHouse 并等待就绪
+- ✅ 自动初始化数据（如果未初始化）
+- ✅ 启动 Web 应用
+- ✅ （可选）启动 AI 聊天服务和实时流
+
+### 方式二：手动启动
 
 ### 1. Clone and Setup
 ```bash
@@ -55,13 +87,11 @@ Wait for ClickHouse to be fully ready (about 30-60 seconds).
 
 ### 3. Generate Test Data
 ```bash
-# Install Python dependencies (in virtual environment)
-source venv/bin/activate
-pip install -r requirements.txt
-
-# Generate substantial test data (this will take a few minutes)
-python3 generate_data.py
+# Generate substantial test data in container (this will take a few minutes)
+docker compose up init-data
 ```
+
+This will automatically generate all test data (500K+ events, 10K users, 1K products, 25K orders) in the container.
 
 ### 4. Start the Web Application
 ```bash
@@ -73,21 +103,79 @@ Open your browser and navigate to: http://localhost:3000
 
 ### 6. (Optional) Start Real-time Data Streaming
 ```bash
-# Start continuous data generation for live dashboard updates
-./start_streaming.sh
+# Start continuous data generation in container for live dashboard updates
+docker compose up -d streaming
 ```
 
 This will add new events and orders every 30 seconds, perfect for demonstrating real-time analytics!
 
-### 7. (Optional) Enable AI Chat Assistant
+To stop streaming:
 ```bash
-# Make sure Ollama is running locally and has llama3 model
-ollama pull llama3
+docker compose stop streaming
+```
 
-# Start AI chat service (uses your local Ollama)
-cd ~/clickhouse-demo
-source venv/bin/activate
-CLICKHOUSE_HOST=localhost CLICKHOUSE_PORT=9000 CLICKHOUSE_USER=demo_user CLICKHOUSE_PASSWORD=demo_password CLICKHOUSE_DB=demo_db OLLAMA_HOST=localhost OLLAMA_PORT=11434 python3 chat_service.py
+To view streaming logs:
+```bash
+docker compose logs -f streaming
+```
+
+### 7. (Optional) Enable AI Chat Assistant
+
+**Prerequisites**: You need Azure OpenAI API credentials.
+
+**Option 1: Using .env file (Recommended)**
+
+1. Copy the example environment file:
+```bash
+cp .env.example .env
+```
+
+2. Edit `.env` and fill in your Azure OpenAI credentials:
+```bash
+AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com
+AZURE_OPENAI_API_KEY=your-api-key-here
+AZURE_OPENAI_DEPLOYMENT_NAME=gpt-4
+```
+
+3. Start the chat service:
+```bash
+docker compose up -d chat
+```
+
+**Option 2: Using environment variables**
+
+1. Set environment variables:
+```bash
+export AZURE_OPENAI_ENDPOINT='https://your-resource.openai.azure.com'
+export AZURE_OPENAI_API_KEY='your-api-key'
+export AZURE_OPENAI_DEPLOYMENT_NAME='gpt-4'  # Optional, defaults to gpt-4
+```
+
+2. Start the chat service:
+```bash
+docker compose up -d chat
+```
+
+**Or use the setup script:**
+```bash
+./scripts/setup_ai_chat.sh
+```
+
+Then access the AI chat interface at: **http://localhost:5001**
+
+**Note**: 
+- Azure OpenAI requires an Azure subscription and OpenAI resource
+- You can use GPT-4, GPT-3.5-turbo, or other Azure OpenAI models
+- API credentials are passed via environment variables
+
+To stop the service:
+```bash
+docker compose stop chat
+```
+
+To view service logs:
+```bash
+docker compose logs -f chat
 ```
 
 This adds an AI assistant that can answer questions about your data in natural language!
@@ -129,19 +217,24 @@ The project includes a smart streaming script that continuously generates new da
 
 ### Usage
 ```bash
-# Start streaming (from project directory)
-./start_streaming.sh
+# Start streaming in container (recommended)
+docker compose up -d streaming
 
-# Or run directly
-source venv/bin/activate
-python3 stream_data.py
+# View streaming logs
+docker compose logs -f streaming
+
+# Stop streaming
+docker compose stop streaming
+
+# Or run locally (requires virtual environment)
+./start_streaming.sh
 ```
 
 Perfect for demonstrating real-time analytics and dashboard updates!
 
 ## 🤖 AI Chat Assistant
 
-Query your ClickHouse data using natural language with Llama 3!
+Query your ClickHouse data using natural language with Azure OpenAI!
 
 ### Features
 - **Natural Language Queries**: Ask questions in plain English
@@ -150,7 +243,7 @@ Query your ClickHouse data using natural language with Llama 3!
 - **Schema Awareness**: AI understands your database structure
 - **Safety First**: Only SELECT queries allowed, no destructive operations
 - **Beautiful Interface**: Modern chat UI with syntax highlighting
-- **Local AI**: Uses your local Ollama installation for privacy and performance
+- **Cloud AI**: Powered by Azure OpenAI (GPT-4, GPT-3.5-turbo, etc.)
 
 ### Example Questions
 - "What are the top 5 countries by revenue?"
@@ -161,33 +254,61 @@ Query your ClickHouse data using natural language with Llama 3!
 - "Show me revenue trends by month"
 
 ### Technical Details
-- **Model**: Llama 3 (via local Ollama)
+- **Model**: Azure OpenAI (GPT-4 by default, configurable)
 - **Interface**: http://localhost:5001
-- **Backend**: Flask + Local Ollama + ClickHouse
+- **Backend**: Flask + Azure OpenAI + ClickHouse
 - **Safety**: Query validation and sanitization
 - **Performance**: Optimized prompts for accurate SQL generation
 
 ### Setup Requirements
+
+1. **Get Azure OpenAI credentials**:
+   - Create an Azure OpenAI resource in Azure Portal
+   - Get your endpoint URL and API key
+   - Deploy a model (e.g., GPT-4, GPT-3.5-turbo)
+
+2. **Configure Azure OpenAI credentials**:
+
+   **Option A: Using .env file (Recommended)**
+   ```bash
+   # Copy the example file
+   cp .env.example .env
+   
+   # Edit .env and fill in your credentials
+   # AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com
+   # AZURE_OPENAI_API_KEY=your-api-key-here
+   # AZURE_OPENAI_DEPLOYMENT_NAME=gpt-4
+   ```
+
+   **Option B: Using environment variables**
+   ```bash
+   export AZURE_OPENAI_ENDPOINT='https://your-resource.openai.azure.com'
+   export AZURE_OPENAI_API_KEY='your-api-key'
+   export AZURE_OPENAI_DEPLOYMENT_NAME='gpt-4'  # Optional, defaults to gpt-4
+   export AZURE_OPENAI_API_VERSION='2024-02-15-preview'  # Optional
+   ```
+
+3. **Start the chat service**:
 ```bash
-# Install Ollama (if not already installed)
-# Visit: https://ollama.ai
-
-# Pull the Llama 3 model
-ollama pull llama3
-
-# Start the chat service
-cd ~/clickhouse-demo
-source venv/bin/activate
-CLICKHOUSE_HOST=localhost python3 chat_service.py
+docker compose up -d chat
 ```
 
+Or use the setup script:
+```bash
+./scripts/setup_ai_chat.sh
+```
+
+**Note**: Docker Compose automatically loads variables from `.env` file if it exists in the project root.
+
 ### ClickHouse Access
+
+#### HTTP Interface
 - **HTTP Interface**: http://localhost:8123
 - **Username**: demo_user
 - **Password**: demo_password
 - **Database**: demo_db
 
-### Manual ClickHouse Queries
+#### Command Line Client
 You can connect directly to ClickHouse using the command line:
 
 ```bash
@@ -198,6 +319,44 @@ docker exec -it clickhouse-demo clickhouse-client --user demo_user --password de
 SELECT count() FROM users;
 SELECT event_type, count() FROM events GROUP BY event_type ORDER BY count() DESC;
 SELECT toYYYYMM(order_date) as month, sum(total_amount) FROM orders WHERE status = 'completed' GROUP BY month ORDER BY month;
+```
+
+## 📁 Project Structure
+
+```
+clickhouse-analytics-demo/
+├── services/              # 各服务目录
+│   ├── app/              # Web 应用服务
+│   │   ├── app.py        # Flask 应用主文件
+│   │   ├── Dockerfile    # Docker 构建文件
+│   │   ├── requirements.txt
+│   │   ├── templates/    # HTML 模板
+│   │   └── static/       # 静态资源
+│   ├── chat/             # AI 聊天服务
+│   │   ├── chat_service.py
+│   │   ├── Dockerfile.chat
+│   │   └── requirements.txt
+│   ├── streaming/        # 实时数据流服务
+│   │   ├── stream_data.py
+│   │   ├── Dockerfile.streaming
+│   │   └── requirements.txt
+│   ├── init-data/        # 数据初始化服务
+│   │   ├── generate_data.py
+│   │   ├── Dockerfile.init-data
+│   │   └── requirements.txt
+│   └── clickhouse/       # ClickHouse 配置
+│       ├── config/       # 配置文件
+│       └── init-scripts/ # 初始化脚本
+├── scripts/              # 启动脚本
+│   ├── start.sh          # 一键启动脚本
+│   ├── stop.sh           # 一键停止脚本
+│   └── ...
+├── docs/                 # 文档
+│   ├── AI_CHAT_FEATURES.md
+│   └── PROJECT_STATUS.md
+├── examples/             # 示例文件
+├── docker-compose.yml    # Docker 编排配置
+└── README.md             # 项目说明
 ```
 
 ## 🏗 Architecture

@@ -1,9 +1,26 @@
 #!/bin/bash
 
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+cd "$PROJECT_ROOT"
+
 echo "🤖 Starting ClickHouse AI Chat Assistant"
 echo "========================================"
 
-# Check if everything is already running
+# Check Azure OpenAI configuration
+if [ -z "$AZURE_OPENAI_ENDPOINT" ] || [ -z "$AZURE_OPENAI_API_KEY" ]; then
+    echo "❌ Error: Azure OpenAI configuration is missing!"
+    echo ""
+    echo "Please set the following environment variables:"
+    echo "  export AZURE_OPENAI_ENDPOINT='https://your-resource.openai.azure.com'"
+    echo "  export AZURE_OPENAI_API_KEY='your-api-key'"
+    echo "  export AZURE_OPENAI_DEPLOYMENT_NAME='gpt-4'  # Optional, defaults to gpt-4"
+    echo ""
+    echo "Or create a .env file with these variables"
+    exit 1
+fi
+
+# Check if chat service is already running
 if curl -s http://localhost:5001/health > /dev/null 2>&1; then
     echo "✅ AI Chat is already running!"
     echo "🌐 Analytics Dashboard: http://localhost:3000"
@@ -12,8 +29,8 @@ if curl -s http://localhost:5001/health > /dev/null 2>&1; then
 fi
 
 # Start all services
-echo "Starting all services..."
-docker compose up -d
+echo "Starting services..."
+docker compose up -d clickhouse chat
 
 echo "Waiting for services to be ready..."
 
@@ -26,32 +43,6 @@ for i in {1..30}; do
     fi
     sleep 2
 done
-
-# Wait for Ollama
-echo "⏳ Waiting for Ollama..."
-for i in {1..30}; do
-    if curl -s http://localhost:11434/api/tags > /dev/null 2>&1; then
-        echo "✅ Ollama is ready!"
-        break
-    fi
-    sleep 3
-done
-
-# Check if Llama model is available
-echo "🔍 Checking for Llama 3.1-8B model..."
-if docker exec clickhouse-demo-ollama ollama list | grep -q "llama3.1:8b"; then
-    echo "✅ Llama 3.1-8B model is available!"
-else
-    echo "📥 Llama 3.1-8B model not found. Downloading..."
-    echo "⚠️  This is a large download (~4.7GB). Please be patient..."
-    docker exec clickhouse-demo-ollama ollama pull llama3.1:8b
-    
-    if [ $? -eq 0 ]; then
-        echo "✅ Model downloaded successfully!"
-    else
-        echo "❌ Failed to download model. Chat may not work properly."
-    fi
-fi
 
 # Wait for chat service
 echo "⏳ Waiting for chat service..."
@@ -67,6 +58,6 @@ echo ""
 echo "🎉 All services are running!"
 echo "========================================"
 echo "🌐 Analytics Dashboard: http://localhost:3000"
-echo "🤖 AI Chat Interface:   http://localhost:5000"
+echo "🤖 AI Chat Interface:   http://localhost:5001"
 echo ""
 echo "💡 Ask the AI questions about your data in natural language!"

@@ -1,26 +1,29 @@
 #!/usr/bin/env python3
 """
 AI Chat Service for ClickHouse Analytics
-Uses Llama 3.1-8B via Ollama to answer questions about the data
+Uses Azure OpenAI to answer questions about the data
 """
 
 import os
 import json
-import requests
 from flask import Flask, request, jsonify, render_template_string
 from clickhouse_driver import Client
-import time
+from openai import AzureOpenAI
 
 app = Flask(__name__)
 
 # Configuration
-OLLAMA_HOST = os.getenv('OLLAMA_HOST', 'ollama')
-OLLAMA_PORT = int(os.getenv('OLLAMA_PORT', '11434'))
 CLICKHOUSE_HOST = os.getenv('CLICKHOUSE_HOST', 'clickhouse')
 CLICKHOUSE_PORT = int(os.getenv('CLICKHOUSE_PORT', '9000'))
 CLICKHOUSE_USER = os.getenv('CLICKHOUSE_USER', 'demo_user')
 CLICKHOUSE_PASSWORD = os.getenv('CLICKHOUSE_PASSWORD', 'demo_password')
 CLICKHOUSE_DB = os.getenv('CLICKHOUSE_DB', 'demo_db')
+
+# Azure OpenAI Configuration
+AZURE_OPENAI_ENDPOINT = os.getenv('AZURE_OPENAI_ENDPOINT', '')
+AZURE_OPENAI_API_KEY = os.getenv('AZURE_OPENAI_API_KEY', '')
+AZURE_OPENAI_API_VERSION = os.getenv('AZURE_OPENAI_API_VERSION', '2024-02-15-preview')
+AZURE_OPENAI_DEPLOYMENT_NAME = os.getenv('AZURE_OPENAI_DEPLOYMENT_NAME', 'gpt-4')
 
 def get_clickhouse_client():
     """Get ClickHouse client"""
@@ -97,31 +100,38 @@ Sample data ranges:
     
     return schema_info
 
-def call_ollama(prompt: str, model: str = "llama3") -> str:
-    """Call Ollama API to get response from Llama model"""
+def get_azure_openai_client():
+    """Get Azure OpenAI client"""
+    if not AZURE_OPENAI_ENDPOINT or not AZURE_OPENAI_API_KEY:
+        raise ValueError("Azure OpenAI configuration is missing. Please set AZURE_OPENAI_ENDPOINT and AZURE_OPENAI_API_KEY environment variables.")
+    
+    return AzureOpenAI(
+        azure_endpoint=AZURE_OPENAI_ENDPOINT,
+        api_key=AZURE_OPENAI_API_KEY,
+        api_version=AZURE_OPENAI_API_VERSION
+    )
+
+def call_azure_openai(prompt: str) -> str:
+    """Call Azure OpenAI API to get response"""
     try:
-        url = f"http://{OLLAMA_HOST}:{OLLAMA_PORT}/api/generate"
-        payload = {
-            "model": model,
-            "prompt": prompt,
-            "stream": False,
-            "options": {
-                "temperature": 0.1,
-                "top_p": 0.9,
-                "max_tokens": 1000
-            }
-        }
+        client = get_azure_openai_client()
         
-        response = requests.post(url, json=payload, timeout=60)
-        response.raise_for_status()
+        response = client.chat.completions.create(
+            model=AZURE_OPENAI_DEPLOYMENT_NAME,
+            messages=[
+                {"role": "system", "content": "You are an expert ClickHouse SQL analyst. Help users analyze their e-commerce data by writing efficient SQL queries."},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.1,
+            max_tokens=1000
+        )
         
-        result = response.json()
-        return result.get('response', 'No response generated')
+        return response.choices[0].message.content
         
-    except requests.exceptions.RequestException as e:
-        return f"Error calling Ollama: {str(e)}"
+    except ValueError as e:
+        return f"Configuration error: {str(e)}"
     except Exception as e:
-        return f"Unexpected error: {str(e)}"
+        return f"Error calling Azure OpenAI: {str(e)}"
 
 def execute_clickhouse_query(query: str):
     """Execute ClickHouse query safely"""
@@ -235,6 +245,8 @@ def chat_interface():
                             <li>"Which product categories perform best?"</li>
                             <li>"How many orders were placed yesterday?"</li>
                         </ul>
+                        <br>
+                        <small class="text-muted">Powered by Azure OpenAI</small>
                     </div>
                 </div>
             </div>
@@ -370,7 +382,7 @@ def chat():
         prompt = create_ai_prompt(question, schema_info)
         
         # Get AI response
-        ai_response = call_ollama(prompt)
+        ai_response = call_azure_openai(prompt)
         
         # Extract SQL query from response
         sql_query = None
@@ -416,16 +428,19 @@ def health():
         ch_status = "unhealthy"
     
     try:
-        # Test Ollama connection
-        response = requests.get(f"http://{OLLAMA_HOST}:{OLLAMA_PORT}/api/tags", timeout=5)
-        ollama_status = "healthy" if response.status_code == 200 else "unhealthy"
+        # Test Azure OpenAI configuration
+        if AZURE_OPENAI_ENDPOINT and AZURE_OPENAI_API_KEY:
+            get_azure_openai_client()
+            ai_status = "configured"
+        else:
+            ai_status = "not_configured"
     except:
-        ollama_status = "unhealthy"
+        ai_status = "error"
     
     return jsonify({
         'clickhouse': ch_status,
-        'ollama': ollama_status,
-        'status': 'healthy' if ch_status == 'healthy' and ollama_status == 'healthy' else 'partial'
+        'azure_openai': ai_status,
+        'status': 'healthy' if ch_status == 'healthy' and ai_status == 'configured' else 'partial'
     })
 
 if __name__ == '__main__':
